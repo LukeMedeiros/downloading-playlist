@@ -11,6 +11,15 @@ with open('api_key.json') as f:
 api_service_name = "youtube"
 api_version = "v3"
 DEVELOPER_KEY = data['apiKey']
+ydl_opts = {
+    'outtmpl': 'songset/%(title)s-%(id)s.%(ext)s', 
+    'format': 'bestaudio/best',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }]
+}
 
 youtube = googleapiclient.discovery.build(
     api_service_name, api_version, developerKey = DEVELOPER_KEY)
@@ -24,19 +33,9 @@ response = request.execute()
 
 # getting the specific video id for each video in the playlist
 for video in response['items']: 
-    print(video['contentDetails']['videoId'])
+    # downloading a specific youtube video
+    youtube_dl.YoutubeDL(ydl_opts).download(['https://www.youtube.com/watch?v='+video['contentDetails']['videoId']])
 
-print(sys.argv[1])
 
-# downloading a specific youtube video
-# ydl_opts = {
-#    'format': 'bestaudio/best',
-#    'postprocessors': [{
-#        'key': 'FFmpegExtractAudio',
-#        'preferredcodec': 'mp3',
-#        'preferredquality': '192',
-#    }]
-# }
 
-# youtube_dl.YoutubeDL(ydl_opts).download(['https://www.youtube.com/watch?v=OOevVQwQ-LM'])
     

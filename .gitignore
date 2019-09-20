@@ -1,2 +1,5 @@
 # don't track my personal api_key
 api_key.json
+
+# don't track mp3 files 
+*.mp3
