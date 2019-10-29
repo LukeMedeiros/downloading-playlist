@@ -27,7 +27,8 @@ youtube = googleapiclient.discovery.build(
 # getting the contents of a specific playlist
 request = youtube.playlistItems().list(
     part="contentDetails",
-    playlistId="PLBY2oJTdHuT8pJN2P8URHHEmmJOu-ZLpm"
+    playlistId="PLBY2oJTdHuT8pJN2P8URHHEmmJOu-ZLpm", 
+    maxResults=50
 )
 response = request.execute()
 
