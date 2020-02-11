@@ -1,0 +1,5 @@
+passwords.json
+__pycache__/
+*.py[cod]
+*.mp3
+api_key.json
