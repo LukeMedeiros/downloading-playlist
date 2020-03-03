@@ -1,7 +1,7 @@
 from pathlib import Path
 import librosa, librosa.display
-import numpy, scipy, matplotlib.pyplot as plt, sklearn, librosa, mir_eval, IPython.display, urllib
-import constant
+import numpy, scipy, matplotlib.pyplot as plt, sklearn, librosa, IPython.display, urllib
+import constants
 
 class Processor:  
     def __init__(self):
@@ -9,7 +9,7 @@ class Processor:
         self.Sr = None
 
     def load_track(self):
-        self.Y, self.Sr =librosa.load(constant.LOCAL_FILENAME, duration=10.0, offset=10.0)
+        self.Y, self.Sr =librosa.load(constants.LOCAL_FILENAME, duration=10.0, offset=10.0)
 
     def get_flattened_mfcc(self):
         return librosa.feature.mfcc(y=self.Y, sr=self.Sr).flatten()

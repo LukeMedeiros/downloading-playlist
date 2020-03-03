@@ -3,7 +3,7 @@ import spotipy.util as util
 import spotipy.oauth2 as oauth2
 import json
 import requests
-import constant
+import constants
 
 class SpotifyDownloader:
     def __init__(self):
@@ -21,7 +21,7 @@ class SpotifyDownloader:
     def download_preview(self, url):
         # Creates the file in the working directory
         spotify_preview = requests.get(url)   
-        downloaded_preview = open(constant.LOCAL_FILENAME, 'wb')
+        downloaded_preview = open(constants.LOCAL_FILENAME, 'wb')
         for chunk in spotify_preview.iter_content(chunk_size=512 * 1024): 
             if chunk: # filter out keep-alive new chunks
                 downloaded_preview.write(chunk)
@@ -32,4 +32,17 @@ class SpotifyDownloader:
         playlist_url = 'https://api.spotify.com/v1/playlists/' + playlist_id + '/tracks'
         response = requests.get(playlist_url, headers={'Authorization': 'Bearer ' + self.token}) 
         return json.loads(response.content)
+
+    def get_genres(self, track):
+        album_id = track['album']['id']
+        album_url = 'https://api.spotify.com/v1/albums/' + album_id
+        response = requests.get(album_url, headers={'Authorization': 'Bearer ' + self.token}) 
+        album_details = json.loads(response.content)
+        return album_details['genres']
+
+    def get_track_by_id(self, id):
+        track_url = "https://api.spotify.com/v1/tracks/" + id
+        response = requests.get(track_url, headers={'Authorization': 'Bearer ' + self.token})
+        return json.loads(response.content)
+
 
