@@ -2,4 +2,5 @@ passwords.json
 __pycache__/
 *.py[cod]
 *.mp3
+*.log
 api_key.json

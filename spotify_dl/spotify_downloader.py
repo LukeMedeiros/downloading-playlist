@@ -27,6 +27,13 @@ class SpotifyDownloader:
                 downloaded_preview.write(chunk)
         downloaded_preview.close()
         return url
+    
+    def get_artists(self, track):
+        track_artists = track[constants.ARTISTS_FIELD]
+        artists = []
+        for artist in track_artists:
+            artists.append(artist[constants.NAME_FIELD])
+        return artists
 
     def get_playlist(self, playlist_id):
         playlist_url = 'https://api.spotify.com/v1/playlists/' + playlist_id + '/tracks'
@@ -37,8 +44,25 @@ class SpotifyDownloader:
         album_id = track['album']['id']
         album_url = 'https://api.spotify.com/v1/albums/' + album_id
         response = requests.get(album_url, headers={'Authorization': 'Bearer ' + self.token}) 
+        print(response.content)
         album_details = json.loads(response.content)
-        return album_details['genres']
+        genres = album_details['genres']
+        if len(genres) == 0:
+            genres = self.get_artist_genres(track)
+        return genres
+    
+    def get_artist_genres(self, track):
+        genres = []
+        for artist in track[constants.ARTISTS_FIELD]:
+            # This artist object is the simplified version that doesn't contain the artist genres    
+            artist_id = artist['id']
+            artist_url = 'https://api.spotify.com/v1/artists/' + artist_id
+            response = requests.get(artist_url, headers={'Authorization': 'Bearer ' + self.token}) 
+            artist_details = json.loads(response.content)
+            genres = artist_details['genres']
+            if len(genres) > 0:
+                return genres     
+        return genres
 
     def get_track_by_id(self, id):
         track_url = "https://api.spotify.com/v1/tracks/" + id
