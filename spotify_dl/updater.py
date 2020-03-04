@@ -64,38 +64,20 @@ class Updater:
         self.delete_file(constants.LOCAL_FILENAME)
 
     def update_neighbours(self, seed_track, all_tracks, tracks_db):
-        # if constants.EUCLIDEAN_DIST not in seed_track: 
         neighbours = []
-        # euclidean = {}
-        for track in all_tracks: 
+        for compare_track in all_tracks: 
             # one feature for now will use the rest once this is implemented properly 
-            dis = -distance.euclidean(seed_track['chroma'], track['chroma'])
-            # euclidean[track['_id']] = dis
-            heapq.heappush(neighbours, (dis, track))
+            dis = -distance.euclidean(seed_track['chroma'], compare_track['chroma'])
+            if seed_track['_id'] != compare_track['_id']: 
+                heapq.heappush(neighbours, (dis, compare_track['_id']))
             if len(neighbours) > NIEGHBOURS: 
                 heapq.heappop(neighbours)
-        # making the list of songs not a tuple 
-        neighbours_dict = {}
-        for track in neighbours:
-            neighbours_dict[track[1]['_id']] = track[0]
-        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {constants.EUCLIDEAN_DIST: neighbours_dict}})
-        print("track id: ", seed_track['_id'])
 
-    def nearest_neighbours(self, seed_track, all_tracks):
-        neighbours = []
-        # euclidean = {}
-        for track in all_tracks: 
-            # one feature for now will use the rest once this is implemented properly 
-            dis = -distance.euclidean(seed_track['chroma'], track['chroma'])
-            # euclidean[track['_id']] = dis
-            heapq.heappush(neighbours, (dis, track))
-            if len(neighbours) > NIEGHBOURS: 
-                heapq.heappop(neighbours)
         # making the list of songs not a tuple 
         neighbours_dict = {}
         for track in neighbours:
-            neighbours_dict[track[1]['_id']] = track[0]
-        return neighbours_dict
+            neighbours_dict[track[1]] = track[0]
+        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {constants.EUCLIDEAN_DIST: neighbours_dict}})
 
 if __name__ == "__main__":
     updater = Updater()
@@ -105,11 +87,7 @@ if __name__ == "__main__":
         db = client.get_database('JustFlow')
         tracks = db.tracks
         spotify_downloader = SpotifyDownloader()
-        all_tracks = tracks.find({})
+        all_tracks = list(tracks.find({}))
         for db_track in all_tracks:
-            print(db_track['_id'])
-            # updater.update_track(db_track['_id'], tracks)
-            try: 
-                updater.update_neighbours(db_track, all_tracks, tracks)
-            except Exception as e:
-                print(e) 
+            updater.update_track(db_track['_id'], tracks)
+            updater.update_neighbours(db_track, all_tracks, tracks)
