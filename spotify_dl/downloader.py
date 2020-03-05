@@ -91,7 +91,7 @@ def download():
         passwords = json.load(file)
     with MongoClient("mongodb+srv://JustFlowAdmin:"+passwords['db_password']+"@justflow-l8dim.mongodb.net/JustFlow?retryWrites=true&w=majority") as client:
         db = client.get_database('JustFlow')
-        tracks = db.test_tracks
+        tracks = db.tracks
         missing_tracks = db.missing_tracks
         missing_track_genres = db.missing_track_genres
         spotify_downloader = SpotifyDownloader()
