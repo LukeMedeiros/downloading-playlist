@@ -12,7 +12,7 @@ import constants
 from scipy.spatial import distance
 import heapq
 
-NIEGHBOURS = 5
+NIEGHBOURS = 20
 
 
 class Updater:
@@ -77,7 +77,7 @@ class Updater:
         neighbours_dict = {}
         for track in neighbours:
             neighbours_dict[track[1]] = track[0]
-        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {constants.EUCLIDEAN_DIST: neighbours_dict}})
+        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {constants.NEIGHBORS: neighbours_dict}})
 
 if __name__ == "__main__":
     updater = Updater()
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         passwords = json.load(file)
     with MongoClient("mongodb+srv://JustFlowAdmin:"+passwords['db_password']+"@justflow-l8dim.mongodb.net/JustFlow?retryWrites=true&w=majority") as client:
         db = client.get_database('JustFlow')
-        tracks = db.tracks
+        tracks = db.test_tracks
         spotify_downloader = SpotifyDownloader()
         all_tracks = list(tracks.find({}))
         for db_track in all_tracks:
