@@ -44,7 +44,6 @@ class SpotifyDownloader:
         album_id = track['album']['id']
         album_url = 'https://api.spotify.com/v1/albums/' + album_id
         response = requests.get(album_url, headers={'Authorization': 'Bearer ' + self.token}) 
-        print(response.content)
         album_details = json.loads(response.content)
         genres = album_details['genres']
         if len(genres) == 0:

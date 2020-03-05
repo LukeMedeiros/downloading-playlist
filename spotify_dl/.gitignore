@@ -4,3 +4,5 @@ __pycache__/
 *.mp3
 *.log
 api_key.json
+updater_logs/
+downloader_logs/
