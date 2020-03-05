@@ -6,13 +6,14 @@ from pymongo import MongoClient
 import librosa
 import json
 from scipy.spatial import distance
+import numpy as np
 from spotify_downloader import SpotifyDownloader
 from processor import Processor
 import constants
 from scipy.spatial import distance
 import heapq
 
-NIEGHBOURS = 5
+NIEGHBOURS = 20
 
 
 class Updater:
@@ -52,7 +53,7 @@ class Updater:
 
         if constants.TEMPO_FIELD not in db_track:
             tempo = self.processor.get_tempo()
-            tracks.update_one({constants.ID_FIELD: db_track_id}, {"$set": {constants.TEMPO_FIELD: tempo}})      
+            tracks.update_one({constants.ID_FIELD: db_track_id}, {"$set": {constants.TEMPO_FIELD: tempo}})  
                          
         if constants.MFCC_FIELD not in db_track:
             mfcc = self.processor.get_flattened_mfcc()
@@ -63,11 +64,11 @@ class Updater:
             tracks.update_one({constants.ID_FIELD: db_track_id}, {"$set": {constants.CHROMA_FIELD: chroma.tolist()}})
         self.delete_file(constants.LOCAL_FILENAME)
 
-    def update_neighbours(self, seed_track, all_tracks, tracks_db):
+    def update_neighbours(self, seed_track, all_tracks, tracks_db, feature):
         neighbours = []
         for compare_track in all_tracks: 
             # one feature for now will use the rest once this is implemented properly 
-            dis = -distance.euclidean(seed_track['chroma'], compare_track['chroma'])
+            dis = -distance.euclidean(seed_track[feature], compare_track[feature])
             if seed_track['_id'] != compare_track['_id']: 
                 heapq.heappush(neighbours, (dis, compare_track['_id']))
             if len(neighbours) > NIEGHBOURS: 
@@ -77,7 +78,38 @@ class Updater:
         neighbours_dict = {}
         for track in neighbours:
             neighbours_dict[track[1]] = track[0]
-        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {constants.EUCLIDEAN_DIST: neighbours_dict}})
+        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {feature + '_neighbors': neighbours_dict}})
+
+    def update_neighbours_combined(self, seed_track, tracks_db):
+        neighbours = []
+        ranged_tracks = []
+        tempo_range = 1
+        # increasing the tempo until we have 40 tracks returned from the query 
+        while len(ranged_tracks) < 40: 
+            tempo_range = tempo_range * 2
+            ranged_tracks = list(tracks_db.find({ 'tempo' : { '$gt' : seed_track['tempo'] - tempo_range, '$lt': seed_track['tempo'] + tempo_range }}))
+        
+        for compare_track in ranged_tracks: 
+            features = ['mfcc', 'chroma'] 
+            dis = 0 
+            seed_normalize = []
+            compare_normalize = []
+            for feature in features: 
+                # one feature for now will use the rest once this is implemented properly 
+                seed_normalize = seed_track[feature] / np.linalg.norm(seed_track[feature])
+                compare_normalize = compare_track[feature] / np.linalg.norm(compare_track[feature])
+                dis += -distance.euclidean(seed_normalize, compare_normalize)
+            if seed_track['_id'] != compare_track['_id']: 
+                heapq.heappush(neighbours, (dis, compare_track['_id']))
+            if len(neighbours) > NIEGHBOURS: 
+                heapq.heappop(neighbours)
+        # making the list of songs not a tuple 
+        neighbours_dict = {}
+        for track in neighbours:
+            neighbours_dict[track[1]] = track[0]
+        print(seed_track['_id'])
+        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {constants.COMBINED_NEIGHBORS: neighbours_dict}})
+        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$unset": {'combined_features': ''}})
 
 if __name__ == "__main__":
     updater = Updater()
@@ -85,9 +117,12 @@ if __name__ == "__main__":
         passwords = json.load(file)
     with MongoClient("mongodb+srv://JustFlowAdmin:"+passwords['db_password']+"@justflow-l8dim.mongodb.net/JustFlow?retryWrites=true&w=majority") as client:
         db = client.get_database('JustFlow')
-        tracks = db.tracks
+        tracks = db.test_tracks_genre_focus
         spotify_downloader = SpotifyDownloader()
         all_tracks = list(tracks.find({}))
         for db_track in all_tracks:
-            updater.update_track(db_track['_id'], tracks)
-            updater.update_neighbours(db_track, all_tracks, tracks)
+            # updater.update_track(db_track['_id'], tracks)
+            # initial algorithm just uses mfcc to find the KNN  
+            # updater.update_neighbours(db_track, all_tracks, tracks, 'mfcc')
+            # combining mfcc, chroma and onset to find the nearest neighbors 
+            updater.update_neighbours_combined(db_track, tracks)
