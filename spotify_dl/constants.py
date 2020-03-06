@@ -9,3 +9,4 @@ TEMPO_FIELD = 'tempo'
 SPOTIFY_DOWNLOAD_FIELD = 'spotify_download'
 GENRES_FIELD = 'genres'
 NEIGHBORS = 'neighbors'
+NIEGHBOURS = 20
