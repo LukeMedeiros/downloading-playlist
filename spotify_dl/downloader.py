@@ -1,105 +1,143 @@
+from pathlib import Path
+from pymongo import MongoClient
+from scipy.spatial import distance
+from spotify_downloader import SpotifyDownloader
+from processor import Processor
+import constants
+from scipy.spatial import distance
+import heapq
+import librosa
 import requests
 import sys
 import os
-from pathlib import Path
-from pymongo import MongoClient
-import librosa
 import json
-from scipy.spatial import distance
-from youtube_downloader import YoutubeDownloader
-from spotify_downloader import SpotifyDownloader
-from processor import Processor
-import constant
+import logging
+
 
 def delete_file(path):
     os.remove(path)
 
-def get_artists(track_artists):
-    artists = []
-    for artist in track_artists:
-        artists.append(artist[constant.NAME_FIELD])
-    return artists
+def create_missing_track(track_id, song_name):
+    return {
+        constants.ID_FIELD : track_id,
+        constants.NAME_FIELD : song_name
+    }
 
-def update_track(track, song_name, artists, processor, tracks):
-    if constant.NAME_FIELD not in track:
-        tracks.update_one({constant.ID_FIELD: track_id}, {"$set": {constant.NAME_FIELD: song_name}}) 
-    if constant.ARTISTS_FIELD not in track:
-        tracks.update_one({constant.ID_FIELD: track_id}, {"$set": {constant.ARTISTS_FIELD: artists}})   
-    if constant.TEMPO_FIELD not in track or constant.MFCC_FIELD not in track or constant.CHROMA_FIELD not in track:
-        spotify_downloader.download_preview(track[constant.PREVIEW_URL_FIELD]) 
-        processor.load_track()
-    else:
-        return
-    if constant.TEMPO_FIELD not in track:
-        tempo = processor.get_tempo()
-        tracks.update_one({constant.ID_FIELD: track_id}, {"$set": {constant.TEMPO_FIELD: tempo}})                    
-    if constant.MFCC_FIELD not in track:
-        mfcc = processor.get_flattened_mfcc()
-        tracks.update_one({constant.ID_FIELD: track_id}, {"$set": {constant.MFCC_FIELD: mfcc.tolist()}})   
-    if constant.CHROMA_FIELD not in track:
-        chroma = processor.get_chroma_features()
-        tracks.update_one({constant.ID_FIELD: track_id}, {"$set": {constant.CHROMA_FIELD: chroma.tolist()}})
-    delete_file(constant.LOCAL_FILENAME)
+def create_missing_track_genres(track_id, song_name):
+    return {
+        constants.ID_FIELD : track_id,
+        constants.NAME_FIELD : song_name
+    }
 
-def create_track(processor, preview_url, spotify_download):             
+def get_neighbors(chroma, all_tracks):
+    neighbors = []
+    for compare_track in all_tracks: 
+        # one feature for now will use the rest once this is implemented properly 
+        dis = -distance.euclidean(chroma, compare_track[constants.CHROMA_FIELD])
+        heapq.heappush(neighbors, (dis, compare_track[constants.ID_FIELD]))
+        if len(neighbors) > constants.NIEGHBOURS: 
+            heapq.heappop(neighbors)
+
+    # making the list of songs not a tuple 
+    neighbors_dict = {}
+    for track in neighbors:
+        neighbors_dict[track[1]] = track[0]
+    return neighbors_dict
+
+def update_neighbors(new_track, all_tracks, tracks_db, Processor):
+    for track in all_tracks: 
+        track_id = track[constants.ID_FIELD]
+        neighbors = []
+
+        # if the track is missing neighbors we need to add them for the track
+        if constants.NEIGHBORS not in track:
+            new_neighbors = get_neighbors(track[constants.CHROMA_FIELD], all_tracks)
+            tracks_db.update_one({constants.ID_FIELD: track_id}, {"$set": {constants.NEIGHBORS: new_neighbors}})  
+            continue
+
+        for key in track[constants.NEIGHBORS]: 
+            neighbors.append((track[constants.NEIGHBORS][key], key))
+
+        neighbors.sort(key = lambda arr: arr[0])
+        dis = -distance.euclidean(new_track[constants.CHROMA_FIELD], track[constants.CHROMA_FIELD])
+        if dis > neighbors[0][0]: 
+            neighbors.pop() 
+            neighbors.append((dis, track_id))
+
+        # making the list of songs not a tuple 
+        neighbours_dict = {}
+        for track in neighbors:
+            neighbours_dict[track[1]] = track[0]
+
+        tracks_db.update_one({constants.ID_FIELD: track_id}, {"$set": {constants.NEIGHBORS: neighbours_dict}})
+
+def create_track(processor, preview_url, spotify_download, track_id, spotify_track, spotify_downloader, tracks_db, missing_track_genres):             
     mfcc = processor.get_flattened_mfcc()
     chroma = processor.get_chroma_features()
     tempo = processor.get_tempo()
-    return  {
-        constant.ID_FIELD : track_id,
-        constant.PREVIEW_URL_FIELD : preview_url,
-        constant.NAME_FIELD : song_name,
-        constant.ARTISTS_FIELD : artists, 
-        constant.MFCC_FIELD : mfcc.tolist(),
-        constant.CHROMA_FIELD : chroma.tolist(),
-        constant.TEMPO_FIELD: tempo,
-        constant.SPOTIFY_DOWNLOAD_FIELD : spotify_download
-    }
+    song_name = spotify_track[constants.NAME_FIELD]  
+    artists = spotify_downloader.get_artists(spotify_track) 
+    genres = spotify_downloader.get_genres(spotify_track)    
+    if len(genres) == 0:
+        print("missing track genres: " + track_id)
+        if missing_track_genres.find_one({constants.ID_FIELD: track_id}) is None:                       
+                missing_track_genres.insert_one(create_missing_track(track_id, song_name))
+        return
 
-def create_missing_track(track_id, song_name):
+    neighbors = get_neighbors(chroma, list(tracks_db.find({})))
     return {
-        constant.ID_FIELD : track_id,
-        constant.NAME_FIELD : song_name
+        constants.ID_FIELD : track_id,
+        constants.PREVIEW_URL_FIELD : preview_url,
+        constants.NAME_FIELD : song_name,
+        constants.ARTISTS_FIELD : artists, 
+        constants.GENRES_FIELD: genres,
+        constants.MFCC_FIELD : mfcc.tolist(),
+        constants.CHROMA_FIELD : chroma.tolist(),
+        constants.TEMPO_FIELD: tempo.tolist(),
+        constants.SPOTIFY_DOWNLOAD_FIELD : spotify_download, 
+        constants.NEIGHBORS : neighbors
     }
 
-# start
-with open('passwords.json', 'r') as file: 
-    passwords = json.load(file)
-with MongoClient("mongodb+srv://JustFlowAdmin:"+passwords['db_password']+"@justflow-l8dim.mongodb.net/JustFlow?retryWrites=true&w=majority") as client:
-    db = client.get_database('JustFlow')
-    tracks = db.tracks
-    missing_tracks = db.missing_tracks
+def download():
+    with open('passwords.json', 'r') as file: 
+        passwords = json.load(file)
+    with MongoClient("mongodb+srv://JustFlowAdmin:"+passwords['db_password']+"@justflow-l8dim.mongodb.net/JustFlow?retryWrites=true&w=majority") as client:
+        db = client.get_database('JustFlow')
+        tracks = db.tracks
+        missing_tracks = db.missing_tracks
+        missing_track_genres = db.missing_track_genres
+        spotify_downloader = SpotifyDownloader()
 
-    spotify_downloader = SpotifyDownloader()
-    processor = Processor()
+        with open('playlists.json', 'r') as file: 
+            playlists = json.load(file)
 
-    with open('playlists.json', 'r') as file: 
-        playlists = json.load(file)
+        
+        for playlist_id in playlists['playlists']:
+            playlist = spotify_downloader.get_playlist(playlist_id)
+            for item in playlist['items']:
+                processor = Processor()
+                spotify_track = item['track']      
+                track_id = spotify_track['id']      
+                
+                if tracks.find_one({constants.ID_FIELD: track_id}) is None:
+                    if spotify_track[constants.PREVIEW_URL_FIELD] is not None:
+                        print("creating track: " + track_id)
+                        preview_url = spotify_downloader.download_preview(spotify_track[constants.PREVIEW_URL_FIELD]) 
+                        spotify_download = True
+                        processor.load_track()
+                        new_track = create_track(processor, preview_url, spotify_download, track_id, spotify_track, spotify_downloader, tracks, missing_track_genres)
+                        # checking to see if the new song affects any of the neighbors from the previous songs
+                        update_neighbors(new_track, list(tracks.find({})), tracks, processor)
+                        tracks.insert_one(new_track)         
+                        delete_file(constants.LOCAL_FILENAME)
+                    else:
+                        print('missing track: ' + spotify_track[constants.NAME_FIELD]   + ' ' + track_id)
+                        if missing_tracks.find_one({constants.ID_FIELD: track_id}) is None:                       
+                            missing_tracks.insert_one(create_missing_track(track_id, spotify_track[constants.NAME_FIELD]))              
 
-    for playlist_id in playlists['playlists']:
-        playlist = spotify_downloader.get_playlist(playlist_id)
-        for item in playlist['items']:
-            track = item['track']       
-            track_id = track['id']
-            song_name = track[constant.NAME_FIELD]  
-            artists = get_artists(track[constant.ARTISTS_FIELD])           
-            if tracks.find_one({constant.ID_FIELD: track_id}) is not None:
-                print("updating :" + track_id)
-                update_track(tracks.find_one({constant.ID_FIELD: track_id}), song_name, artists, processor, tracks)        
-            else:            
-                if track[constant.PREVIEW_URL_FIELD] is not None:
-                    print("creating track: " + track_id)
-                    preview_url = spotify_downloader.download_preview(track[constant.PREVIEW_URL_FIELD]) 
-                    spotify_download = True
-                else:
-                    print('missing track: ' + song_name + ' ' + track_id)
-                    if missing_tracks.find_one({constant.ID_FIELD: track_id}) is None:                       
-                        missing_tracks.insert_one(create_missing_track(track_id, song_name))
-                    continue
-                processor.load_track()
-                new_track = create_track(processor, preview_url, spotify_download)
-                tracks.insert_one(new_track)
-                delete_file(constant.LOCAL_FILENAME)
+if __name__ == "__main__":
+    logger = logging.getLogger('downloader')
+    download()
 
 
 
