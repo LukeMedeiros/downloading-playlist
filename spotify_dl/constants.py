@@ -10,3 +10,5 @@ SPOTIFY_DOWNLOAD_FIELD = 'spotify_download'
 GENRES_FIELD = 'genres'
 MFCC_NEIGHBORS = 'mfcc_neighbors'
 COMBINED_NEIGHBORS = 'combined_neighbors'
+NEIGHBORS = 'neighbors'
+NIEGHBOURS = 20
