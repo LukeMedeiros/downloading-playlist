@@ -66,11 +66,11 @@ class Updater:
 
         self.delete_file(constants.LOCAL_FILENAME)
 
-    def update_neighbours(self, seed_track, all_tracks, tracks_db, feature):
+    def update_neighbours(self, seed_track, all_tracks, tracks_db):
         neighbours = []
         for compare_track in all_tracks: 
             # one feature for now will use the rest once this is implemented properly 
-            dis = -distance.euclidean(seed_track[feature], compare_track[feature])
+            dis = -distance.euclidean(seed_track['mfcc'], compare_track['mfcc'])
             if seed_track['_id'] != compare_track['_id']: 
                 heapq.heappush(neighbours, (dis, compare_track['_id']))
             if len(neighbours) > NIEGHBOURS: 
@@ -80,16 +80,17 @@ class Updater:
         neighbours_dict = {}
         for track in neighbours:
             neighbours_dict[track[1]] = track[0]
-        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {feature + '_neighbors': neighbours_dict}})
+        print(seed_track['_id'])
+        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {constants.MFCC_NEIGHBORS: neighbours_dict}})
 
-    def update_neighbours_combined(self, seed_track, tracks_db):
+    def update_neighbours_combined(self, seed_track, all_tracks, tracks_db):
         neighbours = []
-        ranged_tracks = []
         tempo_range = 1
+        ranged_tracks = []
         # increasing the tempo until we have 40 tracks returned from the query 
-        while len(ranged_tracks) < 40: 
+        while len(ranged_tracks) < 75: 
             tempo_range = tempo_range * 2
-            ranged_tracks = list(tracks_db.find({ 'tempo' : { '$gt' : seed_track['tempo'] - tempo_range, '$lt': seed_track['tempo'] + tempo_range }}))
+            ranged_tracks = [track for track in all_tracks if track.tempo > seed_track['tempo'] - tempo_range and track.tempo < seed_track['tempo'] + tempo_range ]
         
         for compare_track in ranged_tracks: 
             features = ['mfcc', 'chroma'] 
@@ -124,7 +125,10 @@ def update():
         all_tracks = list(tracks.find({}))
         for db_track in all_tracks:
             # updater.update_track(db_track['_id'], tracks)
-            # initial algorithm just uses mfcc to find the KNN  
-            # updater.update_neighbours(db_track, all_tracks, tracks, 'mfcc')
+            # initial algorithm just uses mfcc to find the KNN 
+            # updater.update_neighbours(db_track, all_tracks, tracks)
             # combining mfcc, chroma and onset to find the nearest neighbors 
-            updater.update_neighbours_combined(db_track, tracks)
+            updater.update_neighbours_combined(db_track, all_tracks, tracks)
+
+if __name__ == "__main__":
+    update()
