@@ -1,6 +1,9 @@
 {
-    "playlists": [
-        "2nJsRFJkr7BegSfKpG2d7O",
-        "5tkXZ9sMI2xAGsJXb3EuoK"
-    ]
+    "playlists": {
+        "edm" : ["3pDxuMpz94eDs7WFqudTbZ"], 
+        "pop" : ["6gS3HhOiI17QNojjPuPzqc"], 
+        "classical" : ["3HYK6ri0GkvRcM6GkKh0hJ"], 
+        "tech house" : ["7HxEKL4NF7ZKakfTZiekTr"], 
+        "hip hop" : ["6MjdCkcY5tUfadaakBRINy"]
+    }
 }
