@@ -90,7 +90,7 @@ class Updater:
         # increasing the tempo until we have 40 tracks returned from the query 
         while len(ranged_tracks) < 75: 
             tempo_range = tempo_range * 2
-            ranged_tracks = [track for track in all_tracks if track.tempo > seed_track['tempo'] - tempo_range and track.tempo < seed_track['tempo'] + tempo_range ]
+            ranged_tracks = [track for track in all_tracks if track['tempo'] > seed_track['tempo'] - tempo_range and track['tempo'] < seed_track['tempo'] + tempo_range ]
         
         for compare_track in ranged_tracks: 
             features = ['mfcc', 'chroma'] 
@@ -112,7 +112,6 @@ class Updater:
             neighbours_dict[track[1]] = track[0]
         print(seed_track['_id'])
         tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$set": {constants.COMBINED_NEIGHBORS: neighbours_dict}})
-        tracks_db.update_one({constants.ID_FIELD: seed_track['_id']}, {"$unset": {'combined_features': ''}})
 
 def update():
     updater = Updater()
@@ -120,15 +119,15 @@ def update():
         passwords = json.load(file)
     with MongoClient("mongodb+srv://JustFlowAdmin:"+passwords['db_password']+"@justflow-l8dim.mongodb.net/JustFlow?retryWrites=true&w=majority") as client:
         db = client.get_database('JustFlow')
-        tracks = db.test_tracks_genre_focus
+        tracks = db.test_tracks
         spotify_downloader = SpotifyDownloader()
         all_tracks = list(tracks.find({}))
         for db_track in all_tracks:
             # updater.update_track(db_track['_id'], tracks)
             # initial algorithm just uses mfcc to find the KNN 
-            # updater.update_neighbours(db_track, all_tracks, tracks)
+            updater.update_neighbours(db_track, all_tracks, tracks)
             # combining mfcc, chroma and onset to find the nearest neighbors 
-            updater.update_neighbours_combined(db_track, all_tracks, tracks)
+            # updater.update_neighbours_combined(db_track, all_tracks, tracks)
 
 if __name__ == "__main__":
     update()

@@ -23,7 +23,7 @@ class Processor:
         return self.chroma
 
     def get_tempo(self):
-        self.tempo = librosa.beat.beat_track(y=self.Y, sr=self.Sr, units='time')[1]
+        self.tempo = librosa.beat.beat_track(y=self.Y, sr=self.Sr, units='time')[0]
         return self.tempo
 
 

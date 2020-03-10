@@ -95,7 +95,7 @@ def create_track(processor, preview_url, spotify_download, track_id, spotify_tra
         constants.GENRES_FIELD: genres,
         constants.MFCC_FIELD : mfcc.tolist(),
         constants.CHROMA_FIELD : chroma.tolist(),
-        constants.TEMPO_FIELD: tempo.tolist(),
+        constants.TEMPO_FIELD: tempo,
         constants.SPOTIFY_DOWNLOAD_FIELD : spotify_download
     }
 
@@ -115,6 +115,7 @@ def download():
         
         for genre, playlist_ids in playlists['playlists'].items():
             for playlist_id in playlist_ids:
+                count = 0
                 playlist = spotify_downloader.get_playlist(playlist_id)
                 for item in playlist['items']:
                     processor = Processor()
@@ -123,6 +124,7 @@ def download():
                     
                     if tracks.find_one({constants.ID_FIELD: track_id}) is None:
                         if spotify_track[constants.PREVIEW_URL_FIELD] is not None:
+                            count +=1
                             print("creating track: " + track_id)
                             preview_url = spotify_downloader.download_preview(spotify_track[constants.PREVIEW_URL_FIELD]) 
                             spotify_download = True
@@ -133,6 +135,8 @@ def download():
                             # update_neighbors(new_track, list(tracks.find({})), tracks, processor)
                             tracks.insert_one(new_track)         
                             delete_file(constants.LOCAL_FILENAME)
+                            if count == 50: 
+                                break
                         else:
                             print('missing track: ' + spotify_track[constants.NAME_FIELD]   + ' ' + track_id)
                             if missing_tracks.find_one({constants.ID_FIELD: track_id}) is None:                       
