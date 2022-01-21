@@ -8,5 +8,5 @@ librosa==0.7.0
 pymongo==3.10.1
 matplotlib==3.1.1
 google_api_python_client==1.7.11
-ipython==7.11.1
+ipython==7.16.3
 scikit_learn==0.22.1
